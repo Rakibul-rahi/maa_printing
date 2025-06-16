@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "868252667716",
+    "firebase_url": "https://maa-printing-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "maa-printing",
+    "storage_bucket": "maa-printing.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:868252667716:android:4d175da9d7c1e3935d1111",
+        "android_client_info": {
+          "package_name": "com.example.maaPrinting"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzvnqDR2yBYXQJPpnMaa5-I1SLhTnijLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:868252667716:android:f573ddb9ff8bd1af5d1111",
+        "android_client_info": {
+          "package_name": "com.example.maa_printing"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzvnqDR2yBYXQJPpnMaa5-I1SLhTnijLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

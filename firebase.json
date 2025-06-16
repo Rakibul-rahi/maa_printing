@@ -1,0 +1,57 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "maa-printing",
+          "appId": "1:868252667716:android:f573ddb9ff8bd1af5d1111",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "maa-printing",
+          "configurations": {
+            "android": "1:868252667716:android:f573ddb9ff8bd1af5d1111",
+            "ios": "1:868252667716:ios:4444eed7c3ac5cd65d1111",
+            "macos": "1:868252667716:ios:4444eed7c3ac5cd65d1111",
+            "web": "1:868252667716:web:08a24526b5cd07345d1111",
+            "windows": "1:868252667716:web:25c682c1e3810a345d1111"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    },
+    {
+      "source": "functions_maa_factory",
+      "codebase": "maa_factory",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}
