@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'home.dart';
-import 'stock_hishab.dart';
-import 'danar_party_hishab.dart';
-import 'customer_hishab.dart';
-import 'daily_production_hishab.dart';
+import 'login.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -17,7 +14,6 @@ void main() async {
   FirebaseApp? firebaseApp;
 
   try {
-    // Primary Firebase initialization attempt
     firebaseApp = await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -26,7 +22,6 @@ void main() async {
     print('⚠️ Primary Firebase initialization failed: $e');
 
     try {
-      // Fallback initialization attempt
       print('🔄 Attempting fallback Firebase initialization...');
       firebaseApp = await Firebase.initializeApp(
         name: 'FallbackApp',
@@ -41,18 +36,6 @@ void main() async {
     }
   }
 
-  // Attempt anonymous authentication
-  print('🔐 Attempting anonymous authentication...');
-  try {
-    final authResult = await FirebaseAuth.instance.signInAnonymously();
-    print('👤 Signed in anonymously: ${authResult.user?.uid}');
-  } catch (authError) {
-    print('🔴 Anonymous authentication failed: $authError');
-    runApp(const AuthErrorApp());
-    return;
-  }
-
-  // Test Firestore connection
   print('🔍 Testing Firestore connection...');
   try {
     final firestore = FirebaseFirestore.instance;
@@ -63,7 +46,6 @@ void main() async {
     print('💡 This might affect database operations');
   }
 
-  // Run the main application
   runApp(const MyApp());
 }
 
@@ -103,7 +85,7 @@ class FirebaseErrorApp extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry Initialization'),
                   onPressed: () {
-                    main();
+                    main(); // Retry
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
@@ -134,75 +116,22 @@ class FirebaseErrorApp extends StatelessWidget {
   }
 }
 
-class AuthErrorApp extends StatelessWidget {
-  const AuthErrorApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.orange[50],
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(30.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.person_off, size: 80, color: Colors.orange),
-                const SizedBox(height: 20),
-                const Text(
-                  'Authentication Failed',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'The app could not authenticate with Firebase. Please check:',
-                  style: TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 15),
-                _buildBulletPoint('Anonymous auth is enabled in Firebase Console'),
-                _buildBulletPoint('Internet connection is active'),
-                _buildBulletPoint('Firebase configuration is correct'),
-                const SizedBox(height: 30),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry Authentication'),
-                  onPressed: () {
-                    main();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.circle, size: 8, color: Colors.orange),
-          const SizedBox(width: 10),
-          Text(text, style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  Future<String> _getUserRole(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      return doc.data()?['role'] ?? 'User';
+    } catch (e) {
+      print('⚠️ Error fetching user role: $e');
+      return 'User';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -218,22 +147,37 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomePage(),
-      routes: {
-        '/home': (context) => const HomePage(),
-        '/danar-party': (context) => const DanarPartyHishab(),
-        '/customer': (context) => const CustomerHishab(),
-        '/daily-production': (context) => const DailyProductionHishab(),
-        '/stock': (context) => const StockHishab() // Add this line
-      },
-      onGenerateRoute: (settings) {
-        return MaterialPageRoute(
-          builder: (context) => Scaffold(
-            appBar: AppBar(title: const Text('Error')),
-            body: const Center(child: Text('Page not found!')),
-          ),
-        );
-      },
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // While checking authentication state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          // User is logged in
+          if (snapshot.hasData) {
+            final user = snapshot.data!;
+            return FutureBuilder<String>(
+              future: _getUserRole(user.uid),
+              builder: (context, roleSnapshot) {
+                if (roleSnapshot.connectionState == ConnectionState.done) {
+                  final role = roleSnapshot.data ?? 'User';
+                  return HomePage(userRole: role);
+                }
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              },
+            );
+          }
+
+          // User not logged in
+          return const LoginPage();
+        },
+      ),
     );
   }
 }

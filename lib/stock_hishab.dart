@@ -3,6 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'stock_record_model.dart';
 
+// Define stock items globally
+const List<String> kStockItems = [
+  'LDP', 'LLD', 'D Dana', 'HDP', 'WD', 'Calcium', 'color',
+  '1 no T', '2 no T', '3 no T', 'Bosta', 'Rope', 'Dov'
+];
+
 class StockRecord {
   double value;
   String description;
@@ -10,13 +16,67 @@ class StockRecord {
   StockRecord({this.value = 0.0, this.description = ''});
 }
 
-class HomeStockView extends StatelessWidget {
-  final Map<String, double> currentStock;
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const MaterialApp(
+    home: HomeStockView(),
+  ));
+}
 
-  const HomeStockView({super.key, required this.currentStock});
+class HomeStockView extends StatefulWidget {
+  const HomeStockView({super.key});
+
+  @override
+  State<HomeStockView> createState() => _HomeStockViewState();
+}
+
+class _HomeStockViewState extends State<HomeStockView> {
+  Map<String, double> currentStock = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentStock();
+  }
+
+  Future<void> _loadCurrentStock() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('current_stock')
+          .doc('summary')
+          .get();
+
+      setState(() {
+        if (snapshot.exists) {
+          final data = snapshot.data() as Map<String, dynamic>;
+          currentStock = {};
+          for (var item in kStockItems) {
+            currentStock[item] = (data[item] ?? 0.0).toDouble();
+          }
+        } else {
+          // Initialize with zeros if no data
+          currentStock = { for (var item in kStockItems) item: 0.0 };
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading current stock: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Current Stock Summary'),
@@ -36,7 +96,9 @@ class HomeStockView extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const StockHishab()),
+            MaterialPageRoute(
+              builder: (context) => StockHishab(currentStock: currentStock),
+            ),
           );
         },
         child: const Icon(Icons.table_chart),
@@ -47,55 +109,38 @@ class HomeStockView extends StatelessWidget {
 }
 
 class StockHishab extends StatefulWidget {
-  const StockHishab({super.key});
+  final Map<String, double> currentStock;
+
+  const StockHishab({super.key, required this.currentStock});
 
   @override
   State<StockHishab> createState() => _StockHishabState();
 }
 
 class _StockHishabState extends State<StockHishab> {
-  final List<String> items = [
-    'LDP', 'LLD', 'D Dana', 'HDP', 'WD', 'Calcium', 'color',
-    '1 no T', '2 no T', '3 no T', 'Bosta', 'Rope', 'Dov'
-  ];
-
   final Map<DateTime, Map<String, StockRecord>> records = {};
   DateTime selectedDate = DateTime.now();
   final Map<String, TextEditingController> valueControllers = {};
   final Map<String, TextEditingController> descControllers = {};
   bool hasUnsavedChanges = false;
-  Map<String, double> currentStock = {};
+  late Map<String, double> currentStock;
+
+  // Check if selected date is in the future
+  bool get _isFutureDate {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return selectedDate.isAfter(today);
+  }
 
   @override
   void initState() {
     super.initState();
-    for (var item in items) {
+    currentStock = {...widget.currentStock};
+    for (var item in kStockItems) {
       valueControllers[item] = TextEditingController();
       descControllers[item] = TextEditingController();
-      currentStock[item] = 0.0;
     }
-    _loadCurrentStock();
     _loadDateData();
-  }
-
-  Future<void> _loadCurrentStock() async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('current_stock')
-          .doc('summary')
-          .get();
-
-      if (snapshot.exists) {
-        final data = snapshot.data() as Map<String, dynamic>;
-        setState(() {
-          for (var item in items) {
-            currentStock[item] = (data[item] ?? 0.0).toDouble();
-          }
-        });
-      }
-    } catch (e) {
-      print('Error loading current stock: $e');
-    }
   }
 
   @override
@@ -110,6 +155,8 @@ class _StockHishabState extends State<StockHishab> {
   }
 
   void _updateItem(String item, double delta) {
+    if (_isFutureDate) return; // Block updates for future dates
+
     setState(() {
       hasUnsavedChanges = true;
       final currentValue = double.tryParse(valueControllers[item]!.text) ?? 0.0;
@@ -118,11 +165,13 @@ class _StockHishabState extends State<StockHishab> {
   }
 
   void _saveAllChanges() {
+    if (_isFutureDate) return; // Block saves for future dates
+
     setState(() {
       records.putIfAbsent(selectedDate, () =>
-      {for (var e in items) e: StockRecord()});
+      {for (var e in kStockItems) e: StockRecord()});
 
-      for (var item in items) {
+      for (var item in kStockItems) {
         final value = double.tryParse(valueControllers[item]!.text) ?? 0.0;
         records[selectedDate]![item]!.value = value;
         records[selectedDate]![item]!.description = descControllers[item]!.text;
@@ -170,7 +219,7 @@ class _StockHishabState extends State<StockHishab> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+      lastDate: DateTime.now(), // Only allow dates up to today
     );
 
     if (picked != null) {
@@ -183,7 +232,7 @@ class _StockHishabState extends State<StockHishab> {
   }
 
   void _loadDateData() {
-    for (var item in items) {
+    for (var item in kStockItems) {
       final record = records[selectedDate]?[item] ?? StockRecord();
       valueControllers[item]!.text = record.value.toStringAsFixed(1);
       descControllers[item]!.text = record.description;
@@ -191,6 +240,8 @@ class _StockHishabState extends State<StockHishab> {
   }
 
   void _showDescriptionDialog(String item) {
+    if (_isFutureDate) return; // Block descriptions for future dates
+
     showDialog(
       context: context,
       builder: (context) {
@@ -228,6 +279,16 @@ class _StockHishabState extends State<StockHishab> {
   }
 
   Future<void> _submitToFirestore() async {
+    if (_isFutureDate) { // Block submission for future dates
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot submit data for future dates'),
+            backgroundColor: Colors.red,
+          )
+      );
+      return;
+    }
+
     try {
       _saveAllChanges();
 
@@ -239,7 +300,7 @@ class _StockHishabState extends State<StockHishab> {
       Map<String, double> updatedStock = {...currentStock};
       bool hasChanges = false;
 
-      for (var item in items) {
+      for (var item in kStockItems) {
         final record = records[selectedDate]?[item];
         if (record != null && record.value != 0) {
           hasChanges = true;
@@ -310,7 +371,7 @@ class _StockHishabState extends State<StockHishab> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => HomeStockView(currentStock: currentStock),
+        builder: (context) => const HomeStockView(),
       ),
     );
   }
@@ -365,7 +426,7 @@ class _StockHishabState extends State<StockHishab> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.arrow_forward),
-                  onPressed: () => setState(() {
+                  onPressed: _isFutureDate ? null : () => setState(() {
                     selectedDate = selectedDate.add(const Duration(days: 1));
                     _loadDateData();
                   }),
@@ -373,6 +434,19 @@ class _StockHishabState extends State<StockHishab> {
               ],
             ),
           ),
+
+          // Future date warning
+          if (_isFutureDate)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                'Editing disabled for future dates',
+                style: TextStyle(
+                  color: Colors.red[700],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
 
           // Spreadsheet
           Expanded(
@@ -388,7 +462,7 @@ class _StockHishabState extends State<StockHishab> {
                     DataColumn(label: Text('Add/Sub')),
                     DataColumn(label: Text('Desc')),
                   ],
-                  rows: items.map((item) {
+                  rows: kStockItems.map((item) {
                     final record = records[selectedDate]?[item] ?? StockRecord();
                     return DataRow(cells: [
                       DataCell(SizedBox(width: 80, child: Text(item))),
@@ -399,10 +473,15 @@ class _StockHishabState extends State<StockHishab> {
                             controller: valueControllers[item],
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.all(6),
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.all(6),
+                              filled: _isFutureDate,
+                              fillColor: _isFutureDate
+                                  ? Colors.grey[200]
+                                  : null,
                             ),
+                            enabled: !_isFutureDate,
                             onChanged: (_) => hasUnsavedChanges = true,
                           ),
                         ),
@@ -412,12 +491,22 @@ class _StockHishabState extends State<StockHishab> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.add, size: 20),
-                              onPressed: () => _updateItem(item, 1.0),
+                              icon: Icon(Icons.add,
+                                size: 20,
+                                color: _isFutureDate ? Colors.grey : null,
+                              ),
+                              onPressed: _isFutureDate
+                                  ? null
+                                  : () => _updateItem(item, 1.0),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.remove, size: 20),
-                              onPressed: () => _updateItem(item, -1.0),
+                              icon: Icon(Icons.remove,
+                                size: 20,
+                                color: _isFutureDate ? Colors.grey : null,
+                              ),
+                              onPressed: _isFutureDate
+                                  ? null
+                                  : () => _updateItem(item, -1.0),
                             ),
                           ],
                         ),
@@ -428,11 +517,15 @@ class _StockHishabState extends State<StockHishab> {
                             record.description.isNotEmpty
                                 ? Icons.description
                                 : Icons.description_outlined,
-                            color: record.description.isNotEmpty
+                            color: _isFutureDate
+                                ? Colors.grey
+                                : record.description.isNotEmpty
                                 ? Colors.blue
                                 : Colors.grey,
                           ),
-                          onPressed: () => _showDescriptionDialog(item),
+                          onPressed: _isFutureDate
+                              ? null
+                              : () => _showDescriptionDialog(item),
                         ),
                       ),
                     ]);
@@ -448,9 +541,9 @@ class _StockHishabState extends State<StockHishab> {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.cloud_upload),
               label: const Text('Submit to Firestore'),
-              onPressed: _submitToFirestore,
+              onPressed: _isFutureDate ? null : _submitToFirestore,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: _isFutureDate ? Colors.grey : Colors.green,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -459,10 +552,10 @@ class _StockHishabState extends State<StockHishab> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _saveAllChanges,
+        onPressed: _isFutureDate ? null : _saveAllChanges,
         tooltip: 'Save Changes',
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.save, color: Colors.white),
+        backgroundColor: _isFutureDate ? Colors.grey : Colors.blue,
+        child: Icon(Icons.save, color: _isFutureDate ? Colors.grey[400] : Colors.white),
       ),
     );
   }

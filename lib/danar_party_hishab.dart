@@ -164,11 +164,11 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
                       spacing: 10,
                       children: [
                         Chip(
-                          label: Text('Due: ₹${account.dueAmount.toStringAsFixed(2)}'),
+                          label: Text('Due: \u09F3${account.dueAmount.toStringAsFixed(2)}'),
                           backgroundColor: Colors.red[100],
                         ),
                         Chip(
-                          label: Text('Advance: ₹${account.advanceAmount.toStringAsFixed(2)}'),
+                          label: Text('Advance: \u09F3${account.advanceAmount.toStringAsFixed(2)}'),
                           backgroundColor: Colors.green[100],
                         ),
                       ],
@@ -182,7 +182,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '₹${account.totalBill.toStringAsFixed(2)}',
+                    '\u09F3${account.totalBill.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
