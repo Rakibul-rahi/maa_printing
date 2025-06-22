@@ -1,6 +1,6 @@
 # maa_printing
 
-A new Flutter project.
+A new Flutter project for management of accounts of a small business named 'Maa Printing and Packaging".
 
 ## Getting Started
 
