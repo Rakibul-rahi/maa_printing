@@ -13,7 +13,7 @@ class StockRecord {
   double value;
   String description;
 
-  StockRecord({this.value = 0.0, this.description = ''});
+  StockRecord({this.value = 0.0 , this.description = ''});
 }
 
 void main() async {

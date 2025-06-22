@@ -6,100 +6,165 @@ import 'danar_party_hishab.dart';
 import 'customer_hishab.dart';
 import 'daily_production_hishab.dart';
 import 'stock_hishab.dart';
+import 'notifications_page.dart';
 
 class HomePage extends StatelessWidget {
-  final String userRole;
-  const HomePage({super.key, required this.userRole});
+  final String uid;
+   HomePage({super.key, required this.uid});
 
-  String get welcomeMessage {
-    switch (userRole) {
-      case 'Owner':
-        return 'Welcome, Owner! Full access granted';
-      case 'Admin':
-        return 'Welcome, Admin! Managerial access';
-      case 'Editor':
-        return 'Welcome, Editor! Limited access';
-      default:
-        return 'Welcome to Maa Printing Factory!';
+  Widget _buildNotificationButton(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.notifications),
+      tooltip: 'View Notifications',
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NotificationsPage(roleFilter: _roleFilter),
+          ),
+        );
+      },
+    );
+  }
+
+  // Returns a Firestore query filter string based on user role
+  String _roleFilter = '';
+
+  Future<String> _getUserRoleByUid(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      return doc.data()?['role'] ?? 'User';
+    } catch (e) {
+      print('⚠️ Error fetching user role by UID: $e');
+      return 'User';
     }
   }
 
-  Color get roleColor {
-    switch (userRole) {
-      case 'Owner':
-        return Colors.deepPurple;
-      case 'Admin':
+  Color _roleColor(String role) {
+    switch (role) {
+      case 'owner':
         return Colors.blue;
-      case 'Editor':
+      case 'admin':
+        return Colors.redAccent;
+      case 'editor':
         return Colors.green;
       default:
         return Colors.indigo;
     }
   }
 
+  String _welcomeMessage(String role) {
+    switch (role) {
+      case 'owner':
+        return 'Welcome, Owner! Full access granted';
+      case 'admin':
+        return 'Welcome, Admin! Managerial access';
+      case 'editor':
+        return 'Welcome, Shad';
+      default:
+        return 'Welcome to Maa Printing Factory!';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => false, // Disable back navigation
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Maa Printing Factory'),
-          centerTitle: true,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Row(
-                children: [
-                  Chip(
-                    label: Text(
-                      userRole,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+    return FutureBuilder<String>(
+      future: _getUserRoleByUid(uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final role = snapshot.data!;
+        _roleFilter = role; // set role filter for notifications
+        final roleColor = _roleColor(role);
+        final welcomeMessage = _welcomeMessage(role);
+
+        return PopScope(
+          canPop: false, // This is equivalent to onWillPop: () async => false,
+          onPopInvoked: (bool didPop) {
+            // If canPop is false, didPop will always be false when the back button is pressed.
+            // You can add a dialog or other logic here if you want to
+            // inform the user that they can't go back, but since your original
+            // onWillPop always returned false, you might not need anything here.
+            // For example, to show a toast:
+            // if (!didPop) {
+            //   ScaffoldMessenger.of(context).showSnackBar(
+            //     const SnackBar(content: Text('Cannot go back from this screen.')),
+            //   );
+            // }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Maa Printing Factory'),
+              centerTitle: true,
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Row(
+                    children: [
+                      if (role == 'owner' || role == 'admin') _buildNotificationButton(context),
+                      Chip(
+                        label: Text(
+                          role,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: roleColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       ),
-                    ),
-                    backgroundColor: roleColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.logout),
+                        tooltip: 'Sign out',
+                        onPressed: () async {
+                          await FirebaseAuth.instance.signOut();
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginPage()),
+                                (route) => false,
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.logout),
-                    tooltip: 'Sign out',
-                    onPressed: () async {
-                      await FirebaseAuth.instance.signOut();
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                            (route) => false,
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          child: Center(
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                _buildLogoSection(),
-                const SizedBox(height: 10),
-                _buildWelcomeMessage(),
-                const SizedBox(height: 20),
-                _buildPartyDueCard(),
-                const SizedBox(height: 20),
-                _buildCustomerReceivableCard(),
-                const SizedBox(height: 20),
-                _buildAccountingButtons(context),
-                const SizedBox(height: 40),
+                ),
               ],
             ),
+            body: SingleChildScrollView(
+              child: Center(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildLogoSection(),
+                    const SizedBox(height: 10),
+                    Text(
+                      welcomeMessage,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: roleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildPartyDueCard(),
+                    const SizedBox(height: 20),
+                    _buildCustomerReceivableCard(),
+                    const SizedBox(height: 20),
+                    _buildAccountingButtons(context, role),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -110,17 +175,6 @@ class HomePage extends StatelessWidget {
       height: 120,
       errorBuilder: (context, error, stackTrace) =>
       const Icon(Icons.factory, size: 100, color: Colors.blue),
-    );
-  }
-
-  Widget _buildWelcomeMessage() {
-    return Text(
-      welcomeMessage,
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: roleColor,
-      ),
     );
   }
 
@@ -176,12 +230,12 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildAccountingButtons(BuildContext context) {
+  Widget _buildAccountingButtons(BuildContext context, String role) {
     return Column(
       children: [
         _AccountingButton(
           icon: Icons.account_balance_wallet,
-          label: 'Danar Party Hishab',
+          label: 'Danar Party Heshab',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const DanarPartyHishab()),
@@ -190,7 +244,7 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 20),
         _AccountingButton(
           icon: Icons.groups,
-          label: 'Customer Hishab',
+          label: 'Customer Heshab',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CustomerHishab()),
@@ -199,7 +253,7 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 20),
         _AccountingButton(
           icon: Icons.bar_chart,
-          label: 'Daily Production Hishab',
+          label: 'Daily Production Heshab',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const DailyProductionHishab()),
@@ -208,14 +262,103 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 20),
         _AccountingButton(
           icon: Icons.inventory,
-          label: 'Stock Hishab',
+          label: 'Powder Heshab',
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const HomeStockView(), // Fixed navigation
-            ),
+            MaterialPageRoute(builder: (context) => const HomeStockView()),
           ),
         ),
+        if (role == 'admin')
+          Padding(
+            padding: const EdgeInsets.only(top: 30.0),
+            child: _AccountingButton(
+              icon: Icons.notifications_active,
+              label: 'Notify Owner (Accounts Updated)',
+              onPressed: () async {
+                try {
+                  await FirebaseFirestore.instance.collection('notifications').add({
+                    'to': 'owner',
+                    'message': 'Accounts have been updated by Admin.',
+                    'timestamp': FieldValue.serverTimestamp(),
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ Notification sent to Owner')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('❌ Failed to send: $e')),
+                  );
+                }
+              },
+            ),
+          ),
+        if (role == 'owner') ...[
+          const SizedBox(height: 30),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await FirebaseFirestore.instance.collection('notifications').add({
+                          'to': 'admin',
+                          'message': '✅ Owner approved the accounts.',
+                          'timestamp': FieldValue.serverTimestamp(),
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('✅ Sent to Admin')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('❌ Failed to send: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.thumb_up),
+                    label: const Text('Accounts OK'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await FirebaseFirestore.instance.collection('notifications').add({
+                          'to': 'admin',
+                          'message': '❌ Owner flagged issues in the accounts.',
+                          'timestamp': FieldValue.serverTimestamp(),
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('⚠️ Alert sent to Admin')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('❌ Failed to send: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.thumb_down),
+                    label: const Text('Not OK'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
