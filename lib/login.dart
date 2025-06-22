@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'home.dart'; // Make sure to import your HomePage
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,17 +30,15 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Authenticate user
       final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Fetch user role
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .get();
+      final uid = userCredential.user!.uid;
+
+      // Fetch user role from Firestore
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
       if (!userDoc.exists) {
         await _handleInvalidUser(context);
@@ -49,15 +48,19 @@ class _LoginPageState extends State<LoginPage> {
       final role = userDoc.data()?['role']?.toString().toLowerCase() ?? '';
       final allowedRoles = {'admin', 'editor', 'owner'};
 
-      if (allowedRoles.contains(role)) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/home',
-          arguments: role.capitalize(), // Pass capitalized role to home
-        );
-      } else {
+      if (!allowedRoles.contains(role)) {
         await _handleInvalidUser(context);
+        return;
       }
+
+      // Navigate to HomePage passing uid
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePage(uid: uid),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
       _showErrorSnackbar(context, "❌ Login failed: ${_getFriendlyErrorMessage(e.code)}");
     } catch (e) {
@@ -131,7 +134,6 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogoSection() {
     return Column(
       children: [
-        // Factory Logo
         Image.asset(
           'assets/maa.png',
           height: 120,
@@ -174,7 +176,6 @@ class _LoginPageState extends State<LoginPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Email Field
           const Text(
             "Email Address",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -211,8 +212,6 @@ class _LoginPageState extends State<LoginPage> {
             },
           ),
           const SizedBox(height: 20),
-
-          // Password Field
           const Text(
             "Password",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -260,7 +259,7 @@ class _LoginPageState extends State<LoginPage> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () {
-                // Add password reset functionality
+                // TODO: Implement password reset if desired
               },
               child: const Text(
                 "Forgot Password?",
@@ -269,8 +268,6 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           const SizedBox(height: 25),
-
-          // Login Button
           SizedBox(
             height: 55,
             child: ElevatedButton(
@@ -303,8 +300,6 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           const SizedBox(height: 25),
-
-          // Signup Prompt
           Center(
             child: TextButton(
               onPressed: () => Navigator.pushNamed(context, '/signup'),
@@ -331,12 +326,5 @@ class _LoginPageState extends State<LoginPage> {
         ],
       ),
     );
-  }
-}
-
-// Extension to capitalize role string
-extension StringExtension on String {
-  String capitalize() {
-    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
 }

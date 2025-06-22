@@ -270,7 +270,7 @@ class _ProductionOverviewState extends State<ProductionOverview> {
                 return ListTile(
                   title: Text('${entry.type} - ${entry.operation}'),
                   subtitle: Text(
-                      '${entry.amount.toStringAsFixed(2)} units\n${entry.formatDate()} (${entry.shift})'),
+                      '${entry.amount.toStringAsFixed(2)} KG\n${entry.formatDate()} (${entry.shift})'),
                 );
               }).toList(),
             ),
@@ -328,7 +328,7 @@ class _ProductionOverviewState extends State<ProductionOverview> {
             children: _stock.entries.map((e) {
               return ListTile(
                 title: Text(e.key),
-                trailing: Text('${e.value.toStringAsFixed(2)} units'),
+                trailing: Text('${e.value.toStringAsFixed(2)} KG'),
               );
             }).toList(),
           ),

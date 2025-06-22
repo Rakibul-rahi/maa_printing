@@ -84,9 +84,7 @@ class FirebaseErrorApp extends StatelessWidget {
                 ElevatedButton.icon(
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry Initialization'),
-                  onPressed: () {
-                    main(); // Retry
-                  },
+                  onPressed: () => main(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
@@ -119,13 +117,9 @@ class FirebaseErrorApp extends StatelessWidget {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  Future<String> _getUserRole(String uid) async {
+  Future<String> _getUserRoleByUid(String uid) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       return doc.data()?['role'] ?? 'User';
     } catch (e) {
       print('⚠️ Error fetching user role: $e');
@@ -150,22 +144,20 @@ class MyApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // While checking authentication state
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
 
-          // User is logged in
           if (snapshot.hasData) {
             final user = snapshot.data!;
             return FutureBuilder<String>(
-              future: _getUserRole(user.uid),
+              future: _getUserRoleByUid(user.uid),
               builder: (context, roleSnapshot) {
                 if (roleSnapshot.connectionState == ConnectionState.done) {
-                  final role = roleSnapshot.data ?? 'User';
-                  return HomePage(userRole: role);
+
+                  return HomePage(uid: user.uid);
                 }
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
@@ -174,7 +166,6 @@ class MyApp extends StatelessWidget {
             );
           }
 
-          // User not logged in
           return const LoginPage();
         },
       ),
