@@ -1,4 +1,3 @@
-// customer_transaction_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'party_transaction.dart';
@@ -19,11 +18,12 @@ class CustomerTransactionScreen extends StatefulWidget {
 
 class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
   late final CollectionReference transactionsRef;
+  final Set<String> _selectedTransactionIds = {};
+  bool _isSelectionMode = false;
 
   @override
   void initState() {
     super.initState();
-    // Changed to customerAccounts collection
     transactionsRef = FirebaseFirestore.instance
         .collection('customerAccounts')
         .doc(widget.partyId)
@@ -33,7 +33,17 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.partyName} Transactions')),
+      appBar: AppBar(
+        title: Text('${widget.partyName} Transactions'),
+        actions: _isSelectionMode
+            ? [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _confirmDeleteSelectedTransactions,
+          ),
+        ]
+            : null,
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: transactionsRef.orderBy('date', descending: true).snapshots(),
         builder: (context, snapshot) {
@@ -47,8 +57,8 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
 
           final docs = snapshot.data!.docs;
 
-          double totalSales = 0;  // Renamed from totalAmount
-          double totalReceived = 0;  // Renamed from totalPaid
+          double totalSales = 0;
+          double totalReceived = 0;
 
           final transactions = docs.map((doc) {
             final tx = PartyTransaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
@@ -57,7 +67,7 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
             return tx;
           }).toList();
 
-          final balance = totalSales - totalReceived;  // Inverted calculation
+          final balance = totalSales - totalReceived;
 
           return Column(
             children: [
@@ -89,6 +99,39 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                   itemBuilder: (context, index) {
                     final tx = transactions[index];
                     return ListTile(
+                      leading: _isSelectionMode
+                          ? Checkbox(
+                        value: _selectedTransactionIds.contains(tx.id),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected == true) {
+                              _selectedTransactionIds.add(tx.id);
+                            } else {
+                              _selectedTransactionIds.remove(tx.id);
+                            }
+                            _isSelectionMode = _selectedTransactionIds.isNotEmpty;
+                          });
+                        },
+                      )
+                          : null,
+                      onLongPress: () {
+                        setState(() {
+                          _isSelectionMode = true;
+                          _selectedTransactionIds.add(tx.id);
+                        });
+                      },
+                      onTap: _isSelectionMode
+                          ? () {
+                        setState(() {
+                          if (_selectedTransactionIds.contains(tx.id)) {
+                            _selectedTransactionIds.remove(tx.id);
+                            _isSelectionMode = _selectedTransactionIds.isNotEmpty;
+                          } else {
+                            _selectedTransactionIds.add(tx.id);
+                          }
+                        });
+                      }
+                          : null,
                       title: Text('Sale: ৳${tx.amount}, Received: ৳${tx.paid}'),
                       subtitle: Text(tx.description),
                       trailing: Text(
@@ -106,6 +149,41 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTransactionForm(context),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _confirmDeleteSelectedTransactions() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Selected Transactions'),
+        content: Text('Are you sure you want to delete ${_selectedTransactionIds.length} transactions?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              for (var id in _selectedTransactionIds) {
+                await transactionsRef.doc(id).delete();
+              }
+
+              setState(() {
+                _selectedTransactionIds.clear();
+                _isSelectionMode = false;
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Transactions deleted.')),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
@@ -172,7 +250,6 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
 
-                // Add transaction to customer collection
                 await transactionsRef.add({
                   'amount': saleAmount,
                   'paid': receivedAmount,
@@ -180,7 +257,6 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                   'date': selectedDate,
                 });
 
-                // Update customer account summary
                 final customerRef = FirebaseFirestore.instance
                     .collection('customerAccounts')
                     .doc(widget.partyId);

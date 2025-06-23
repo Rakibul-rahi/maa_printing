@@ -182,13 +182,7 @@ class _CustomerHishabState extends State<CustomerHishab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '\u09F3${account.totalBill.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
+
                   const SizedBox(height: 4),
                   Text(
                     'Last: ${_formatDate(account.lastTransactionDate)}',
