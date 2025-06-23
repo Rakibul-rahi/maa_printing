@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'party_transaction.dart';
+
 class PartyTransactionScreen extends StatefulWidget {
   final String partyId;
   final String partyName;
@@ -17,6 +18,8 @@ class PartyTransactionScreen extends StatefulWidget {
 
 class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
   late final CollectionReference transactionsRef;
+  final Set<String> _selectedTransactionIds = {};
+  bool _isSelectionMode = false;
 
   @override
   void initState() {
@@ -30,7 +33,17 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.partyName} Transactions')),
+      appBar: AppBar(
+        title: Text('${widget.partyName} Transactions'),
+        actions: _isSelectionMode
+            ? [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _confirmDeleteSelected,
+          ),
+        ]
+            : null,
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: transactionsRef.orderBy('date', descending: true).snapshots(),
         builder: (context, snapshot) {
@@ -43,7 +56,6 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
           }
 
           final docs = snapshot.data!.docs;
-
           double totalAmount = 0;
           double totalPaid = 0;
 
@@ -86,6 +98,39 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                   itemBuilder: (context, index) {
                     final tx = transactions[index];
                     return ListTile(
+                      leading: _isSelectionMode
+                          ? Checkbox(
+                        value: _selectedTransactionIds.contains(tx.id),
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedTransactionIds.add(tx.id);
+                            } else {
+                              _selectedTransactionIds.remove(tx.id);
+                            }
+                            _isSelectionMode = _selectedTransactionIds.isNotEmpty;
+                          });
+                        },
+                      )
+                          : null,
+                      onLongPress: () {
+                        setState(() {
+                          _isSelectionMode = true;
+                          _selectedTransactionIds.add(tx.id);
+                        });
+                      },
+                      onTap: _isSelectionMode
+                          ? () {
+                        setState(() {
+                          if (_selectedTransactionIds.contains(tx.id)) {
+                            _selectedTransactionIds.remove(tx.id);
+                            _isSelectionMode = _selectedTransactionIds.isNotEmpty;
+                          } else {
+                            _selectedTransactionIds.add(tx.id);
+                          }
+                        });
+                      }
+                          : null,
                       title: Text('Amount: ৳${tx.amount}, Paid: ৳${tx.paid}'),
                       subtitle: Text(tx.description),
                       trailing: Text(
@@ -103,6 +148,39 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTransactionForm(context),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _confirmDeleteSelected() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Selected Transactions'),
+        content: Text('Are you sure you want to delete ${_selectedTransactionIds.length} transaction(s)?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              for (var id in _selectedTransactionIds) {
+                await transactionsRef.doc(id).delete();
+              }
+              setState(() {
+                _selectedTransactionIds.clear();
+                _isSelectionMode = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Transactions deleted.')),
+              );
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
@@ -127,13 +205,15 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                   decoration: const InputDecoration(labelText: 'Amount'),
                   keyboardType: TextInputType.number,
                   onSaved: (value) => amount = double.parse(value!),
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                  validator: (value) =>
+                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
                   decoration: const InputDecoration(labelText: 'Paid'),
                   keyboardType: TextInputType.number,
                   onSaved: (value) => paid = double.parse(value!),
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                  validator: (value) =>
+                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
                   decoration: const InputDecoration(labelText: 'Description'),
@@ -149,9 +229,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                       lastDate: DateTime(2100),
                     );
                     if (picked != null) {
-                      setState(() {
-                        selectedDate = picked;
-                      });
+                      setState(() => selectedDate = picked);
                     }
                   },
                   child: const Text('Select Date'),
@@ -161,7 +239,10 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
@@ -175,8 +256,10 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                   'date': selectedDate,
                 });
 
-                // Update summary in partyAccounts
-                final partyRef = FirebaseFirestore.instance.collection('partyAccounts').doc(widget.partyId);
+                // Update summary
+                final partyRef = FirebaseFirestore.instance
+                    .collection('partyAccounts')
+                    .doc(widget.partyId);
 
                 await FirebaseFirestore.instance.runTransaction((tx) async {
                   final snapshot = await tx.get(partyRef);

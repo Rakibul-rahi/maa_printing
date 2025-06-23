@@ -7,6 +7,7 @@ import 'customer_hishab.dart';
 import 'daily_production_hishab.dart';
 import 'stock_hishab.dart';
 import 'notifications_page.dart';
+import 'ready_goods.dart';
 
 class HomePage extends StatelessWidget {
   final String uid;
@@ -261,11 +262,20 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _AccountingButton(
-          icon: Icons.inventory,
+          icon: Icons.add_business,
           label: 'Powder Heshab',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const HomeStockView()),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _AccountingButton(
+          icon: Icons.inventory,
+          label: 'Ready Goods',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ReadyGoodsInventoryScreen()),
           ),
         ),
         if (role == 'admin')
