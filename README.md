@@ -183,37 +183,6 @@ The exact collection names may depend on the implementation inside each module f
 
 ---
 
-## Build APK
-
-To build a debug APK:
-
-```bash
-flutter clean
-flutter pub get
-flutter build apk --debug
-```
-
-The APK will be generated here:
-
-```text
-build/app/outputs/flutter-apk/app-debug.apk
-```
-
-This APK can be uploaded to Appetize.io for live Android app preview.
-
-To build a release APK:
-
-```bash
-flutter build apk --release
-```
-
-The release APK will be generated here:
-
-```text
-build/app/outputs/flutter-apk/app-release.apk
-```
-
----
 
 ## Screenshots
 
