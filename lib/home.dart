@@ -1,8 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  // Logout function
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      // Navigate to login screen and remove all previous routes
+      Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+              (route) => false
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout failed: ${e.toString()}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10,6 +28,14 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Maa Printing Factory'),
         centerTitle: true,
+        actions: [
+          // Logout button
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _logout(context),
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Center(
