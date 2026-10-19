@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home.dart'; // Make sure to import your HomePage
+import 'request_access_screen.dart';
+import 'l10n/l10n.dart';
+import 'settings/settings_sheet.dart';
+import 'theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -62,26 +66,27 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } on FirebaseAuthException catch (e) {
-      _showErrorSnackbar(context, "❌ Login failed: ${_getFriendlyErrorMessage(e.code)}");
+      _showErrorSnackbar(context, context.l10n.loginFailed(_getFriendlyErrorMessage(e.code)));
     } catch (e) {
-      _showErrorSnackbar(context, "❌ Unexpected error occurred");
+      _showErrorSnackbar(context, context.l10n.unexpectedError);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   String _getFriendlyErrorMessage(String code) {
+    final l10n = context.l10n;
     switch (code) {
       case 'user-not-found':
-        return 'No account found with this email';
+        return l10n.errUserNotFound;
       case 'wrong-password':
-        return 'Incorrect password';
+        return l10n.errWrongPassword;
       case 'invalid-email':
-        return 'Invalid email format';
+        return l10n.errInvalidEmail;
       case 'user-disabled':
-        return 'Account has been disabled';
+        return l10n.errUserDisabled;
       default:
-        return 'Authentication failed';
+        return l10n.errAuthFailed;
     }
   }
 
@@ -89,8 +94,24 @@ class _LoginPageState extends State<LoginPage> {
     await FirebaseAuth.instance.signOut();
     _showErrorSnackbar(
       context,
-      "❌ Access denied: Contact administrator",
+      context.l10n.accessDenied,
       duration: const Duration(seconds: 5),
+    );
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final sentTo = await showDialog<String>(
+      context: context,
+      builder: (context) => _ForgotPasswordDialog(initialEmail: _emailController.text.trim()),
+    );
+    if (sentTo == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.resetEmailSent(sentTo)),
+        backgroundColor: Colors.green[700],
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -108,6 +129,13 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        actions: const [SettingsButton()],
+      ),
+      extendBodyBehindAppBar: true,
       body: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -146,22 +174,22 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          "MAA PRINTING FACTORY",
+        Text(
+          context.l10n.appNameCaps,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2,
-            color: Colors.indigo,
+            color: context.brandTextColor,
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          "Management System",
+          context.l10n.managementSystem,
           style: TextStyle(
             fontSize: 16,
-            color: Colors.grey[700],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
           textAlign: TextAlign.center,
@@ -176,15 +204,15 @@ class _LoginPageState extends State<LoginPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Email Address",
+          Text(
+            context.l10n.emailAddress,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: _emailController,
             decoration: InputDecoration(
-              hintText: "your@email.com",
+              hintText: context.l10n.emailHint,
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -193,7 +221,7 @@ class _LoginPageState extends State<LoginPage> {
               contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade400),
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -203,17 +231,17 @@ class _LoginPageState extends State<LoginPage> {
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your email';
+                return context.l10n.enterEmail;
               }
               if (!value.contains('@')) {
-                return 'Please enter a valid email';
+                return context.l10n.enterValidEmail;
               }
               return null;
             },
           ),
           const SizedBox(height: 20),
-          const Text(
-            "Password",
+          Text(
+            context.l10n.password,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 8),
@@ -221,7 +249,7 @@ class _LoginPageState extends State<LoginPage> {
             controller: _passwordController,
             obscureText: _obscurePassword,
             decoration: InputDecoration(
-              hintText: "Enter your password",
+              hintText: context.l10n.enterPasswordHint,
               prefixIcon: const Icon(Icons.lock_outline),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -237,7 +265,7 @@ class _LoginPageState extends State<LoginPage> {
               contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade400),
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -246,10 +274,10 @@ class _LoginPageState extends State<LoginPage> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your password';
+                return context.l10n.enterPassword;
               }
               if (value.length < 6) {
-                return 'Password must be at least 6 characters';
+                return context.l10n.passwordMinLength;
               }
               return null;
             },
@@ -258,12 +286,10 @@ class _LoginPageState extends State<LoginPage> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {
-                // TODO: Implement password reset if desired
-              },
-              child: const Text(
-                "Forgot Password?",
-                style: TextStyle(color: Colors.indigo),
+              onPressed: _isLoading ? null : _showForgotPasswordDialog,
+              child: Text(
+                context.l10n.forgotPassword,
+                style: TextStyle(color: context.brandTextColor),
               ),
             ),
           ),
@@ -273,7 +299,7 @@ class _LoginPageState extends State<LoginPage> {
             child: ElevatedButton(
               onPressed: _isLoading ? null : () => _login(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo[700],
+                backgroundColor: context.brandButtonColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -289,9 +315,9 @@ class _LoginPageState extends State<LoginPage> {
                   color: Colors.white,
                 ),
               )
-                  : const Text(
-                "SIGN IN",
-                style: TextStyle(
+                  : Text(
+                context.l10n.signIn,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
@@ -302,19 +328,24 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 25),
           Center(
             child: TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/signup'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RequestAccessScreen(initialEmail: _emailController.text.trim()),
+                ),
+              ),
               child: RichText(
                 text: TextSpan(
-                  text: "Don't have an account? ",
+                  text: context.l10n.noAccount,
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                   ),
-                  children: const [
+                  children: [
                     TextSpan(
-                      text: "Request Access",
+                      text: context.l10n.requestAccess,
                       style: TextStyle(
-                        color: Colors.indigo,
+                        color: context.brandTextColor,
                         fontWeight: FontWeight.bold,
                       ),
                     )
@@ -325,6 +356,112 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final String initialEmail;
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController = TextEditingController(text: widget.initialEmail);
+  bool _sending = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendResetEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+    final email = _emailController.text.trim();
+
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) Navigator.pop(context, email);
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        final l10n = context.l10n;
+        _error = switch (e.code) {
+          'invalid-email' => l10n.errInvalidEmail,
+          'user-not-found' => l10n.errUserNotFound,
+          'too-many-requests' => l10n.errTooManyRequests,
+          'network-request-failed' => l10n.errNoInternet,
+          _ => l10n.errResetFailed(e.code),
+        };
+      });
+    } catch (_) {
+      setState(() => _error = context.l10n.unexpectedError);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.l10n.resetPassword),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.l10n.resetPasswordInfo),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailController,
+              autofocus: widget.initialEmail.isEmpty,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: context.l10n.emailAddress,
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              validator: (value) {
+                final v = value?.trim() ?? '';
+                if (v.isEmpty) return context.l10n.enterEmail;
+                if (!v.contains('@')) return context.l10n.enterValidEmail;
+                return null;
+              },
+              onFieldSubmitted: (_) => _sendResetEmail(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: TextStyle(color: context.dangerColor)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sending ? null : () => Navigator.pop(context),
+          child: Text(context.l10n.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _sending ? null : _sendResetEmail,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: context.brandButtonColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+          ),
+          child: _sending
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(context.l10n.sendLink),
+        ),
+      ],
     );
   }
 }

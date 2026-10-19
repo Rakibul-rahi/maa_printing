@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'party_transaction.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
 
 class CustomerTransactionScreen extends StatefulWidget {
   final String partyId;
@@ -30,35 +32,53 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
         .collection('transactions');
   }
 
+  Future<void> _recalculateBalance() async {
+    final querySnapshot = await transactionsRef.get();
+    double totalSales = 0;
+    double totalReceived = 0;
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      totalSales += (data['amount'] as num?)?.toDouble() ?? 0;
+      totalReceived += (data['paid'] as num?)?.toDouble() ?? 0;
+    }
+
+    await FirebaseFirestore.instance.collection('customerAccounts').doc(widget.partyId).update({
+      'totalBill': totalSales,
+      'totalPaid': totalReceived,
+      'updatedAt': DateTime.now(),
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.balanceRecalculated)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.partyName} Transactions'),
-        actions: _isSelectionMode
-            ? [
+        title: Text(context.l10n.transactionsTitle(widget.partyName)),
+        actions: [
           IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _confirmDeleteSelectedTransactions,
+            icon: const Icon(Icons.refresh),
+            tooltip: context.l10n.recalculate,
+            onPressed: _recalculateBalance,
           ),
-        ]
-            : null,
+          if (_isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _confirmDeleteSelectedTransactions,
+            ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: transactionsRef.orderBy('date', descending: true).snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text("Error loading transactions."));
-          }
-
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final docs = snapshot.data!.docs;
 
-          double totalSales = 0;
-          double totalReceived = 0;
+          double totalSales = 0, totalReceived = 0;
 
           final transactions = docs.map((doc) {
             final tx = PartyTransaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
@@ -76,15 +96,15 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Sales: ৳${totalSales.toStringAsFixed(2)}'),
-                    Text('Total Received: ৳${totalReceived.toStringAsFixed(2)}'),
+                    Text(context.l10n.totalSales(context.money(totalSales))),
+                    Text(context.l10n.totalReceived(context.money(totalReceived))),
                     Text(
                       balance > 0
-                          ? 'Due: ৳${balance.toStringAsFixed(2)}'
-                          : 'Advance: ৳${balance.abs().toStringAsFixed(2)}',
+                          ? context.l10n.dueAmount(context.money(balance))
+                          : context.l10n.advanceAmount(context.money(balance.abs())),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: balance > 0 ? Colors.red : Colors.green,
+                        color: balance > 0 ? context.dangerColor : context.successColor,
                       ),
                     ),
                   ],
@@ -93,7 +113,7 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
               const Divider(),
               Expanded(
                 child: transactions.isEmpty
-                    ? const Center(child: Text("No transactions yet."))
+                    ? Center(child: Text(context.l10n.noTransactions))
                     : ListView.builder(
                   itemCount: transactions.length,
                   itemBuilder: (context, index) {
@@ -104,11 +124,9 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                         value: _selectedTransactionIds.contains(tx.id),
                         onChanged: (selected) {
                           setState(() {
-                            if (selected == true) {
-                              _selectedTransactionIds.add(tx.id);
-                            } else {
-                              _selectedTransactionIds.remove(tx.id);
-                            }
+                            selected == true
+                                ? _selectedTransactionIds.add(tx.id)
+                                : _selectedTransactionIds.remove(tx.id);
                             _isSelectionMode = _selectedTransactionIds.isNotEmpty;
                           });
                         },
@@ -123,19 +141,17 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                       onTap: _isSelectionMode
                           ? () {
                         setState(() {
-                          if (_selectedTransactionIds.contains(tx.id)) {
-                            _selectedTransactionIds.remove(tx.id);
-                            _isSelectionMode = _selectedTransactionIds.isNotEmpty;
-                          } else {
-                            _selectedTransactionIds.add(tx.id);
-                          }
+                          _selectedTransactionIds.contains(tx.id)
+                              ? _selectedTransactionIds.remove(tx.id)
+                              : _selectedTransactionIds.add(tx.id);
+                          _isSelectionMode = _selectedTransactionIds.isNotEmpty;
                         });
                       }
                           : null,
-                      title: Text('Sale: ৳${tx.amount}, Received: ৳${tx.paid}'),
+                      title: Text(context.l10n.saleReceivedLine(context.money(tx.amount), context.money(tx.paid))),
                       subtitle: Text(tx.description),
                       trailing: Text(
-                        '${tx.date.day}/${tx.date.month}/${tx.date.year}',
+                        context.date(tx.date),
                         style: const TextStyle(fontSize: 12),
                       ),
                     );
@@ -157,31 +173,24 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Selected Transactions'),
-        content: Text('Are you sure you want to delete ${_selectedTransactionIds.length} transactions?'),
+        title: Text(context.l10n.deleteSelectedTransactions),
+        content: Text(context.l10n.deleteTransactionsConfirm(_selectedTransactionIds.length)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.cancel)),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(context);
               for (var id in _selectedTransactionIds) {
                 await transactionsRef.doc(id).delete();
               }
-
+              _recalculateBalance();
               setState(() {
                 _selectedTransactionIds.clear();
                 _isSelectionMode = false;
               });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transactions deleted.')),
-              );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -190,36 +199,33 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
 
   void _showAddTransactionForm(BuildContext context) {
     final formKey = GlobalKey<FormState>();
-    double saleAmount = 0;
-    double receivedAmount = 0;
+    double saleAmount = 0, receivedAmount = 0;
     String description = '';
     DateTime selectedDate = DateTime.now();
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Customer Transaction'),
+        title: Text(context.l10n.addTransaction),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
             child: Column(
               children: [
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Sale Amount'),
+                  decoration: InputDecoration(labelText: context.l10n.saleAmount),
                   keyboardType: TextInputType.number,
+                  validator: _validateAmount,
                   onSaved: (value) => saleAmount = double.parse(value!),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Received Amount'),
+                  decoration: InputDecoration(labelText: context.l10n.receivedAmount),
                   keyboardType: TextInputType.number,
+                  validator: _validateAmount,
                   onSaved: (value) => receivedAmount = double.parse(value!),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Description'),
+                  decoration: InputDecoration(labelText: context.l10n.description),
                   onSaved: (value) => description = value ?? '',
                 ),
                 const SizedBox(height: 8),
@@ -235,53 +241,39 @@ class _CustomerTransactionScreenState extends State<CustomerTransactionScreen> {
                       setState(() => selectedDate = picked);
                     }
                   },
-                  child: const Text('Select Date'),
+                  child: Text(context.l10n.selectDate),
                 ),
               ],
             ),
           ),
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
-
                 await transactionsRef.add({
                   'amount': saleAmount,
                   'paid': receivedAmount,
                   'description': description,
                   'date': selectedDate,
                 });
-
-                final customerRef = FirebaseFirestore.instance
-                    .collection('customerAccounts')
-                    .doc(widget.partyId);
-
-                await FirebaseFirestore.instance.runTransaction((tx) async {
-                  final snapshot = await tx.get(customerRef);
-                  final data = snapshot.data()!;
-                  final prevSales = (data['totalBill'] as num?)?.toDouble() ?? 0.0;
-                  final prevReceived = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
-
-                  tx.update(customerRef, {
-                    'totalBill': prevSales + saleAmount,
-                    'totalPaid': prevReceived + receivedAmount,
-                    'lastTransactionDate': selectedDate,
-                    'updatedAt': DateTime.now(),
-                  });
-                });
-
+                await _recalculateBalance();
                 Navigator.pop(context);
               }
             },
-            child: const Text('Add'),
+            child: Text(context.l10n.add),
           ),
         ],
       ),
     );
+  }
+
+  String? _validateAmount(String? value) {
+    if (value == null || value.isEmpty) return context.l10n.requiredField;
+    final num = double.tryParse(value);
+    if (num == null || num < 0) return context.l10n.enterValidNonNegative;
+    return null;
   }
 }

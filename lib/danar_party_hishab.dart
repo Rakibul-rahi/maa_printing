@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'danar_party_model.dart';
 import 'danar_party_transaction_screen.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
 
 class DanarPartyHishab extends StatefulWidget {
   const DanarPartyHishab({super.key});
@@ -17,29 +19,29 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Party'),
-        content: Text('Are you sure you want to delete "$partyName"?'),
+        title: Text(context.l10n.deleteParty),
+        content: Text(context.l10n.deleteConfirmName(partyName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(context);
               try {
                 await _firestore.collection('partyAccounts').doc(partyId).delete();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Party deleted')),
+                  SnackBar(content: Text(context.l10n.partyDeleted)),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete: $e')),
+                  SnackBar(content: Text(context.l10n.failedToDelete(e))),
                 );
               }
             },
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -50,7 +52,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Danar Party Hishab'),
+        title: Text(context.l10n.danarPartyHishab),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -63,7 +65,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by party name...',
+                hintText: context.l10n.searchParty,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10.0),
@@ -84,7 +86,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
               stream: _firestore.collection('partyAccounts').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(child: Text(context.l10n.errorWithMessage(snapshot.error!)));
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -93,7 +95,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
 
                 final accounts = snapshot.data!.docs;
                 if (accounts.isEmpty) {
-                  return const Center(child: Text('No party accounts found'));
+                  return Center(child: Text(context.l10n.noPartyAccounts));
                 }
 
                 final filteredAccounts = accounts.where((account) {
@@ -157,19 +159,19 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('Contact: ${account.contactPerson}'),
-                    Text('Phone: ${account.phone}'),
+                    Text(context.l10n.contactLabel(account.contactPerson)),
+                    Text(context.l10n.phoneLabel(account.phone)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 10,
                       children: [
                         Chip(
-                          label: Text('Due: \u09F3${account.dueAmount.toStringAsFixed(2)}'),
-                          backgroundColor: Colors.red[100],
+                          label: Text(context.l10n.dueAmount(context.money(account.dueAmount))),
+                          backgroundColor: context.dangerContainer,
                         ),
                         Chip(
-                          label: Text('Advance: \u09F3${account.advanceAmount.toStringAsFixed(2)}'),
-                          backgroundColor: Colors.green[100],
+                          label: Text(context.l10n.advanceAmount(context.money(account.advanceAmount))),
+                          backgroundColor: context.successContainer,
                         ),
                       ],
                     ),
@@ -185,14 +187,14 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
 
                   const SizedBox(height: 4),
                   Text(
-                    'Last: ${_formatDate(account.lastTransactionDate)}',
+                    context.l10n.lastDate(context.date(account.lastTransactionDate)),
                     style: const TextStyle(fontSize: 12),
                   ),
                   const SizedBox(height: 8),
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: Icon(Icons.delete, color: context.dangerColor),
                     onPressed: () => _confirmDeleteParty(account.id, account.partyName),
-                    tooltip: 'Delete Party',
+                    tooltip: context.l10n.deleteParty,
                   ),
                 ],
               ),
@@ -204,9 +206,6 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
   }
 
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2,'0')}/${date.month.toString().padLeft(2,'0')}/${date.year}';
-  }
 
   void _showAddPartyDialog() {
     final formKey = GlobalKey<FormState>();
@@ -215,27 +214,27 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Party'),
+        title: Text(context.l10n.addParty),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Party Name'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                decoration: InputDecoration(labelText: context.l10n.partyName),
+                validator: (v) => v == null || v.isEmpty ? context.l10n.requiredField : null,
                 onSaved: (v) => name = v!,
               ),
               const SizedBox(height: 10),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Contact Person'),
+                decoration: InputDecoration(labelText: context.l10n.contactPerson),
                 onSaved: (v) => contact = v!,
               ),
               const SizedBox(height: 10),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Phone'),
+                decoration: InputDecoration(labelText: context.l10n.phone),
                 keyboardType: TextInputType.phone,
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.isEmpty ? context.l10n.requiredField : null,
                 onSaved: (v) => phone = v!,
               ),
             ],
@@ -244,7 +243,7 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -268,12 +267,12 @@ class _DanarPartyHishabState extends State<DanarPartyHishab> {
                   if (mounted) Navigator.pop(context);
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text(context.l10n.errorWithMessage(e))),
                   );
                 }
               }
             },
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),

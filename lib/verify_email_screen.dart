@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'l10n/l10n.dart';
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
 
@@ -33,11 +34,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       await user?.sendEmailVerification();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification email resent!')),
+        SnackBar(content: Text(context.l10n.verificationResent)),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(content: Text(context.l10n.errorWithMessage(e))),
       );
     }
   }
@@ -45,7 +46,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify Email')),
+      appBar: AppBar(title: Text(context.l10n.verifyEmail)),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -53,31 +54,30 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           children: [
             const Icon(Icons.email_outlined, size: 80, color: Colors.blue),
             const SizedBox(height: 20),
-            const Text(
-              'Check your email',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            Text(
+              context.l10n.checkYourEmail,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'We\'ve sent a verification link to your email address. '
-                  'Please click the link to verify your account.',
+            Text(
+              context.l10n.verifyEmailInfo,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 30),
             ElevatedButton.icon(
               icon: const Icon(Icons.email),
-              label: const Text('Resend Verification Email'),
+              label: Text(context.l10n.resendVerification),
               onPressed: resendVerification,
             ),
             const SizedBox(height: 15),
             ElevatedButton(
-              child: const Text('I\'ve verified my email'),
+              child: Text(context.l10n.iVerified),
               onPressed: checkEmailVerification,
             ),
             const SizedBox(height: 15),
             TextButton(
-              child: const Text('Sign out'),
+              child: Text(context.l10n.signOut),
               onPressed: () => FirebaseAuth.instance.signOut(),
             ),
           ],

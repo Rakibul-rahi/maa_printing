@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'party_transaction.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
 
 class PartyTransactionScreen extends StatefulWidget {
   final String partyId;
@@ -34,7 +36,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.partyName} Transactions'),
+        title: Text(context.l10n.transactionsTitle(widget.partyName)),
         actions: _isSelectionMode
             ? [
           IconButton(
@@ -48,7 +50,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
         stream: transactionsRef.orderBy('date', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text("Error loading transactions."));
+            return Center(child: Text(context.l10n.errorLoadingTransactions));
           }
 
           if (!snapshot.hasData) {
@@ -75,15 +77,15 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Bill: ৳${totalAmount.toStringAsFixed(2)}'),
-                    Text('Total Paid: ৳${totalPaid.toStringAsFixed(2)}'),
+                    Text(context.l10n.totalBill(context.money(totalAmount))),
+                    Text(context.l10n.totalPaid(context.money(totalPaid))),
                     Text(
                       balance < 0
-                          ? 'Due: ৳${(balance.abs()).toStringAsFixed(2)}'
-                          : 'Advance: ৳${balance.toStringAsFixed(2)}',
+                          ? context.l10n.dueAmount(context.money(balance.abs()))
+                          : context.l10n.advanceAmount(context.money(balance)),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: balance < 0 ? Colors.red : Colors.green,
+                        color: balance < 0 ? context.dangerColor : context.successColor,
                       ),
                     ),
                   ],
@@ -92,7 +94,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
               const Divider(),
               Expanded(
                 child: transactions.isEmpty
-                    ? const Center(child: Text("No transactions yet."))
+                    ? Center(child: Text(context.l10n.noTransactions))
                     : ListView.builder(
                   itemCount: transactions.length,
                   itemBuilder: (context, index) {
@@ -131,10 +133,10 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                         });
                       }
                           : null,
-                      title: Text('Amount: ৳${tx.amount}, Paid: ৳${tx.paid}'),
+                      title: Text(context.l10n.amountPaidLine(context.money(tx.amount), context.money(tx.paid))),
                       subtitle: Text(tx.description),
                       trailing: Text(
-                        '${tx.date.day}/${tx.date.month}/${tx.date.year}',
+                        context.date(tx.date),
                         style: const TextStyle(fontSize: 12),
                       ),
                     );
@@ -156,15 +158,15 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Selected Transactions'),
-        content: Text('Are you sure you want to delete ${_selectedTransactionIds.length} transaction(s)?'),
+        title: Text(context.l10n.deleteSelectedTransactions),
+        content: Text(context.l10n.deleteTransactionsConfirm(_selectedTransactionIds.length)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(context);
               for (var id in _selectedTransactionIds) {
@@ -175,10 +177,10 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                 _isSelectionMode = false;
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transactions deleted.')),
+                SnackBar(content: Text(context.l10n.transactionsDeleted)),
               );
             },
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -195,28 +197,28 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Transaction'),
+        title: Text(context.l10n.addTransaction),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
             child: Column(
               children: [
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Amount'),
+                  decoration: InputDecoration(labelText: context.l10n.amount),
                   keyboardType: TextInputType.number,
                   onSaved: (value) => amount = double.parse(value!),
                   validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
+                  value == null || value.isEmpty ? context.l10n.requiredField : null,
                 ),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Paid'),
+                  decoration: InputDecoration(labelText: context.l10n.paid),
                   keyboardType: TextInputType.number,
                   onSaved: (value) => paid = double.parse(value!),
                   validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
+                  value == null || value.isEmpty ? context.l10n.requiredField : null,
                 ),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Description'),
+                  decoration: InputDecoration(labelText: context.l10n.description),
                   onSaved: (value) => description = value ?? '',
                 ),
                 const SizedBox(height: 8),
@@ -232,7 +234,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                       setState(() => selectedDate = picked);
                     }
                   },
-                  child: const Text('Select Date'),
+                  child: Text(context.l10n.selectDate),
                 ),
               ],
             ),
@@ -241,7 +243,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -278,7 +280,7 @@ class _PartyTransactionScreenState extends State<PartyTransactionScreen> {
                 Navigator.pop(context);
               }
             },
-            child: const Text('Add'),
+            child: Text(context.l10n.add),
           ),
         ],
       ),

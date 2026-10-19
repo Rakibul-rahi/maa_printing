@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
+import 'theme/app_widgets.dart';
 
 class ProductionEntry {
   final String id;
@@ -43,11 +46,6 @@ class ProductionEntry {
     );
   }
 
-  String formatDate() {
-    final date = timestamp.toDate();
-    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
   static String formatDateString(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
@@ -60,7 +58,7 @@ class DailyProductionHishab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Production Hishab'),
+        title: Text(context.l10n.dailyProductionHishab),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -112,7 +110,7 @@ class _ProductionOverviewState extends State<ProductionOverview> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load stock: $e';
+        _error = context.l10n.failedToLoadStock(e);
         _isLoading = false;
       });
     }
@@ -164,15 +162,15 @@ class _ProductionOverviewState extends State<ProductionOverview> {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(context.l10n.errorWithMessage(e))),
       );
     }
   }
 
   void _showEntryDialog(String shift) {
-    showDialog(
-      context: context,
-      builder: (_) => ProductionEntryDialog(
+    showEntrySheet<void>(
+      context,
+      (_) => ProductionEntryDialog(
         shift: shift,
         onSubmit: (type, amount, operation, date) {
           _updateStock(type, amount, operation, shift, date);
@@ -190,18 +188,18 @@ class _ProductionOverviewState extends State<ProductionOverview> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Set Initial Stock'),
+        title: Text(context.l10n.setInitialStock),
         content: SingleChildScrollView(
           child: Column(
             children: controllers.entries
-                .map((e) => _buildTextField(e.key, e.value))
+                .map((e) => _buildTextField(context.l10n.productType(e.key), e.value))
                 .toList(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -212,7 +210,7 @@ class _ProductionOverviewState extends State<ProductionOverview> {
               setState(() => _stock = updated);
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -259,18 +257,19 @@ class _ProductionOverviewState extends State<ProductionOverview> {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text('History for ${_formatDate(selected)}'),
+          title: Text(context.l10n.historyFor(context.date(selected))),
           content: SizedBox(
             width: double.maxFinite,
             child: entries.isEmpty
-                ? const Text('No history found')
+                ? Text(context.l10n.noHistory)
                 : ListView(
               shrinkWrap: true,
               children: entries.map((entry) {
                 return ListTile(
-                  title: Text('${entry.type} - ${entry.operation}'),
+                  title: Text('${context.l10n.productType(entry.type)} - ${context.l10n.operation(entry.operation)}'),
                   subtitle: Text(
-                      '${entry.amount.toStringAsFixed(2)} KG\n${entry.formatDate()} (${entry.shift})'),
+                      '${context.l10n.kgAmount(context.number(entry.amount))}\n'
+                      '${context.dateTime(entry.timestamp.toDate())} (${context.l10n.shiftName(entry.shift)})'),
                 );
               }).toList(),
             ),
@@ -278,7 +277,7 @@ class _ProductionOverviewState extends State<ProductionOverview> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text(context.l10n.close),
             ),
           ],
         ),
@@ -286,12 +285,10 @@ class _ProductionOverviewState extends State<ProductionOverview> {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(context.l10n.errorWithMessage(e))),
       );
     }
   }
-
-  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -300,59 +297,94 @@ class _ProductionOverviewState extends State<ProductionOverview> {
     }
 
     if (_error.isNotEmpty) {
-      return Center(child: Text('Error: $_error'));
+      return Center(child: Text(context.l10n.errorWithMessage(_error)));
     }
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        const SizedBox(height: 16),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Expanded(
               child: Text(
-                'Current Stock',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                context.l10n.currentStock,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
             IconButton(
               onPressed: _setInitialStock,
-              icon: const Icon(Icons.settings),
-              tooltip: 'Set Stock',
+              icon: const Icon(Icons.tune),
+              tooltip: context.l10n.setStock,
             ),
           ],
         ),
-        Expanded(
-          child: ListView(
-            children: _stock.entries.map((e) {
-              return ListTile(
-                title: Text(e.key),
-                trailing: Text('${e.value.toStringAsFixed(2)} KG'),
-              );
-            }).toList(),
-          ),
+        const SizedBox(height: 8),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.9,
+          children: _stock.entries.map((e) {
+            final c = productColor(e.key);
+            return Card(
+              color: c.withValues(alpha: context.isDark ? 0.22 : 0.12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: c.withValues(alpha: 0.7), width: 1.5),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      context.l10n.productType(e.key),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        context.l10n.kgAmount(context.number(e.value)),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         ),
-        const Divider(),
+        const SizedBox(height: 24),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            ElevatedButton(
-              onPressed: () => _showEntryDialog('Day'),
-              child: const Text('Day Shift'),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _showEntryDialog('Day'),
+                icon: const Icon(Icons.wb_sunny_outlined),
+                label: Text(context.l10n.dayShift),
+              ),
             ),
-            ElevatedButton(
-              onPressed: () => _showEntryDialog('Night'),
-              child: const Text('Night Shift'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade900, foregroundColor: Colors.white),
+                onPressed: () => _showEntryDialog('Night'),
+                icon: const Icon(Icons.nightlight_outlined),
+                label: Text(context.l10n.nightShift),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        ElevatedButton(
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
           onPressed: _viewHistory,
-          child: const Text('View History'),
+          icon: const Icon(Icons.history),
+          label: Text(context.l10n.viewHistory),
         ),
-        const SizedBox(height: 20),
       ],
     );
   }
@@ -374,90 +406,83 @@ class ProductionEntryDialog extends StatefulWidget {
 
 class _ProductionEntryDialogState extends State<ProductionEntryDialog> {
   String _type = 'Pani';
-  double _amount = 0.0;
   String _operation = 'Blowing';
   DateTime _date = DateTime.now();
+  final _amountCtrl = TextEditingController();
 
-  final _types = ['Pani', '1 No', '2 No', '3 No'];
-  final _operations = ['Blowing', 'Cutting', 'Wastage'];
+  static const _types = ['Pani', '1 No', '2 No', '3 No'];
+  static const _operations = ['Blowing', 'Cutting', 'Wastage'];
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && mounted) setState(() => _date = picked);
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('${widget.shift} Shift Entry'),
-      content: SingleChildScrollView(
-        child: Column(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          context.l10n.shiftEntry(context.l10n.shiftName(widget.shift)),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
           children: [
-            Row(
-              children: [
-                const Text("Date: "),
-                TextButton(
-                  onPressed: _pickDate,
-                  child: Text(
-                    '${_date.day}/${_date.month}/${_date.year}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            DropdownButton<String>(
-              value: _type,
-              isExpanded: true,
-              onChanged: (val) => setState(() => _type = val!),
-              items: _types
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Amount',
-                border: OutlineInputBorder(),
+            for (final t in _types)
+              ChoiceChip(
+                label: Text(context.l10n.productType(t)),
+                selected: _type == t,
+                selectedColor: productColor(t).withValues(alpha: 0.35),
+                side: BorderSide(color: productColor(t)),
+                onSelected: (_) => setState(() => _type = t),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
-            ),
-            const SizedBox(height: 10),
-            DropdownButton<String>(
-              value: _operation,
-              isExpanded: true,
-              onChanged: (val) => setState(() => _operation = val!),
-              items: _operations
-                  .map((op) => DropdownMenuItem(value: op, child: Text(op)))
-                  .toList(),
-            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final op in _operations)
+              ChoiceChip(
+                label: Text(context.l10n.operation(op)),
+                selected: _operation == op,
+                onSelected: (_) => setState(() => _operation = op),
+              ),
+          ],
         ),
-        ElevatedButton(
+        const SizedBox(height: 16),
+        AmountStepper(controller: _amountCtrl, step: 5, allowNegative: false, autofocus: true),
+        const SizedBox(height: 4),
+        Text(
+          context.l10n.amountIn(context.l10n.unitKg),
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: DateChip(date: _date, onChanged: (d) => setState(() => _date = d)),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          icon: const Icon(Icons.check),
+          label: Text(context.l10n.submit),
           onPressed: () {
-            if (_amount <= 0) {
+            final amount = parseAmount(_amountCtrl.text) ?? 0;
+            if (amount <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid amount')),
+                SnackBar(content: Text(context.l10n.enterValidAmount)),
               );
               return;
             }
-
-            widget.onSubmit(_type, _amount, _operation, _date);
+            widget.onSubmit(_type, amount, _operation, _date);
             Navigator.pop(context);
           },
-          child: const Text('Submit'),
         ),
       ],
     );

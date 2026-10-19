@@ -1,10 +1,11 @@
-// customer_hishab.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'customer_model.dart';
-import 'customer_transaction_screen.dart'; // Changed to customer transaction screen
+import 'customer_transaction_screen.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
 
-class CustomerHishab extends StatefulWidget { // Renamed to CustomerHishab
+class CustomerHishab extends StatefulWidget {
   const CustomerHishab({super.key});
 
   @override
@@ -19,45 +20,62 @@ class _CustomerHishabState extends State<CustomerHishab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Party'),
-        content: Text('Are you sure you want to delete "$partyName"?'),
+        title: Text(context.l10n.deleteCustomer),
+        content: Text(context.l10n.deleteConfirmName(partyName)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.cancel)),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(context);
               try {
-                // Changed to customerAccounts collection
+                final txRef = _firestore.collection('customerAccounts').doc(partyId).collection('transactions');
+                final txSnapshot = await txRef.get();
+                for (var doc in txSnapshot.docs) {
+                  await doc.reference.delete();
+                }
                 await _firestore.collection('customerAccounts').doc(partyId).delete();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Party deleted')),
+                  SnackBar(content: Text(context.l10n.customerDeleted)),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete: $e')),
+                  SnackBar(content: Text(context.l10n.failedToDelete(e))),
                 );
               }
             },
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _recalculateBalanceForCustomer(String customerId) async {
+    final transactionsRef = _firestore.collection('customerAccounts').doc(customerId).collection('transactions');
+    final querySnapshot = await transactionsRef.get();
+
+    double totalSales = 0;
+    double totalReceived = 0;
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      totalSales += (data['amount'] as num?)?.toDouble() ?? 0;
+      totalReceived += (data['paid'] as num?)?.toDouble() ?? 0;
+    }
+
+    await _firestore.collection('customerAccounts').doc(customerId).update({
+      'totalBill': totalSales,
+      'totalPaid': totalReceived,
+      'updatedAt': DateTime.now(),
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customer Accounts'), // Changed title
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text(context.l10n.customerAccounts),
       ),
       body: Column(
         children: [
@@ -66,11 +84,9 @@ class _CustomerHishabState extends State<CustomerHishab> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by customer name...', // Updated hint
+                hintText: context.l10n.searchCustomer,
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.clear),
                   onPressed: () {
@@ -84,33 +100,23 @@ class _CustomerHishabState extends State<CustomerHishab> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // Changed to customerAccounts collection
-              stream: _firestore.collection('customerAccounts').snapshots(),
+              stream: _firestore.collection('customerAccounts').orderBy('updatedAt', descending: true).snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final accounts = snapshot.data!.docs;
-                if (accounts.isEmpty) {
-                  return const Center(child: Text('No customer accounts found')); // Updated text
-                }
-
-                final filteredAccounts = accounts.where((account) {
-                  final data = account.data() as Map<String, dynamic>;
-                  final partyName = data['partyName']?.toString().toLowerCase() ?? '';
+                final filtered = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final name = data['partyName']?.toString().toLowerCase() ?? '';
                   final searchTerm = _searchController.text.toLowerCase();
-                  return partyName.contains(searchTerm);
+                  return name.contains(searchTerm);
                 }).toList();
 
+                if (filtered.isEmpty) return Center(child: Text(context.l10n.noMatchingCustomers));
+
                 return ListView.builder(
-                  itemCount: filteredAccounts.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final doc = filteredAccounts[index];
+                    final doc = filtered[index];
                     final data = doc.data() as Map<String, dynamic>;
                     final account = PartyAccount.fromMap(doc.id, data);
                     return _buildPartyCard(account);
@@ -122,158 +128,117 @@ class _CustomerHishabState extends State<CustomerHishab> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddPartyDialog(),
+        onPressed: _showAddCustomerDialog,
         child: const Icon(Icons.add),
       ),
     );
   }
 
   Widget _buildPartyCard(PartyAccount account) {
+    final balance = account.totalBill - account.totalPaid;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: InkWell(
-        onTap: () {
+      child: ListTile(
+        onTap: () async {
+          await _recalculateBalanceForCustomer(account.id); // ensure balance is up to date
+          if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => CustomerTransactionScreen( // Changed to CustomerTransactionScreen
+              builder: (_) => CustomerTransactionScreen(
                 partyId: account.id,
                 partyName: account.partyName,
               ),
             ),
           );
         },
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      account.partyName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Contact: ${account.contactPerson}'),
-                    Text('Phone: ${account.phone}'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      children: [
-                        Chip(
-                          label: Text('Due: \u09F3${account.dueAmount.toStringAsFixed(2)}'),
-                          backgroundColor: Colors.red[100],
-                        ),
-                        Chip(
-                          label: Text('Advance: \u09F3${account.advanceAmount.toStringAsFixed(2)}'),
-                          backgroundColor: Colors.green[100],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-
-                  const SizedBox(height: 4),
-                  Text(
-                    'Last: ${_formatDate(account.lastTransactionDate)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _confirmDeleteParty(account.id, account.partyName),
-                    tooltip: 'Delete Party',
-                  ),
-                ],
-              ),
-            ],
-          ),
+        title: Text(account.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.l10n.contactLabel(account.contactPerson)),
+            Text(context.l10n.phoneLabel(account.phone)),
+            const SizedBox(height: 4),
+            Text(
+              balance >= 0
+                  ? context.l10n.dueAmount(context.money(balance))
+                  : context.l10n.advanceAmount(context.money(balance.abs())),
+              style: TextStyle(color: balance >= 0 ? context.dangerColor : context.successColor),
+            ),
+            const SizedBox(height: 4),
+            Text(context.l10n.lastDate(context.date(account.lastTransactionDate)), style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        trailing: IconButton(
+          icon: Icon(Icons.delete, color: context.dangerColor),
+          onPressed: () => _confirmDeleteParty(account.id, account.partyName),
         ),
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2,'0')}/${date.month.toString().padLeft(2,'0')}/${date.year}';
-  }
-
-  void _showAddPartyDialog() {
+  void _showAddCustomerDialog() {
     final formKey = GlobalKey<FormState>();
     String name = '', contact = '', phone = '';
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Customer'), // Updated title
+        title: Text(context.l10n.addCustomer),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Customer Name'), // Updated label
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                decoration: InputDecoration(labelText: context.l10n.customerName),
+                validator: (v) => v == null || v.isEmpty ? context.l10n.requiredField : null,
                 onSaved: (v) => name = v!,
               ),
               const SizedBox(height: 10),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Contact Person'),
-                onSaved: (v) => contact = v!,
+                decoration: InputDecoration(labelText: context.l10n.contactPerson),
+                onSaved: (v) => contact = v ?? '',
               ),
               const SizedBox(height: 10),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Phone'),
+                decoration: InputDecoration(labelText: context.l10n.phone),
                 keyboardType: TextInputType.phone,
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.isEmpty ? context.l10n.requiredField : null,
                 onSaved: (v) => phone = v!,
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
-
                 final now = DateTime.now();
                 final newAccount = PartyAccount(
                   partyName: name,
                   contactPerson: contact,
                   phone: phone,
-                  totalBill: 0.0,
-                  totalPaid: 0.0,
+                  totalBill: 0,
+                  totalPaid: 0,
                   lastTransactionDate: now,
                   createdAt: now,
                   updatedAt: now,
                 );
-
                 try {
-                  // Save to customerAccounts collection
                   await _firestore.collection('customerAccounts').add(newAccount.toMap());
                   if (mounted) Navigator.pop(context);
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text(context.l10n.errorWithMessage(e))),
                   );
                 }
               }
             },
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
