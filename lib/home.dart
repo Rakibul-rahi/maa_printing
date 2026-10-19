@@ -277,13 +277,15 @@ class _HomePageState extends State<HomePage> {
       _MenuItem(Icons.add_business, context.l10n.menuPowder, Colors.purple, const HomeStockView()),
       _MenuItem(Icons.inventory, context.l10n.menuReadyGoods, Colors.blue, const ReadyGoodsInventoryScreen()),
     ];
-    return GridView.count(
-      crossAxisCount: 2,
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.15,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        mainAxisExtent: 128,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+      ),
       children: [
         for (final m in items)
           _MenuTile(

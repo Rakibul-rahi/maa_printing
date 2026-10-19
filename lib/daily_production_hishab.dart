@@ -319,13 +319,15 @@ class _ProductionOverviewState extends State<ProductionOverview> {
           ],
         ),
         const SizedBox(height: 8),
-        GridView.count(
-          crossAxisCount: 2,
+        GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.9,
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 260,
+            mainAxisExtent: 88,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+          ),
           children: _stock.entries.map((e) {
             final c = productColor(e.key);
             return Card(
