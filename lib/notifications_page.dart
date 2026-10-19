@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'l10n/l10n.dart';
+import 'theme/app_theme.dart';
 
 class NotificationsPage extends StatelessWidget {
   final String roleFilter;
@@ -15,13 +17,13 @@ class NotificationsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(context.l10n.notifications),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: notificationsStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text('❌ Error loading notifications'));
+            return Center(child: Text(context.l10n.errorLoadingNotifications));
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -31,21 +33,21 @@ class NotificationsPage extends StatelessWidget {
           final docs = snapshot.data!.docs;
 
           if (docs.isEmpty) {
-            return const Center(child: Text('No notifications yet.'));
+            return Center(child: Text(context.l10n.noNotifications));
           }
 
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
-              final message = data['message'] ?? 'No message';
+              final message = data['message'] ?? context.l10n.noMessage;
               final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
 
               return ListTile(
-                leading: const Icon(Icons.notification_important, color: Colors.indigo),
+                leading: Icon(Icons.notification_important, color: context.brandTextColor),
                 title: Text(message),
                 subtitle: timestamp != null
-                    ? Text('${timestamp.toLocal()}'.split('.')[0])
+                    ? Text(context.dateTime(timestamp.toLocal()))
                     : null,
               );
             },
