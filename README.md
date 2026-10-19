@@ -1,271 +1,207 @@
 # Maa Printing Factory Management
 
-Maa Printing Factory Management is a Flutter-based factory accounting and management application designed for managing daily business records of Maa Printing. The system helps authorized users track party accounts, customer accounts, daily production records, stock information, and overall financial summaries from a single dashboard.
-
-The application uses Firebase Authentication for secure login and Cloud Firestore for real-time data storage and updates.
+A Flutter-based factory accounting and management app for **Maa Printing**. It lets authorized staff track party accounts, customer accounts, daily production, powder stock and ready goods, and chat with each other, all from one app. Firebase Authentication handles login and Cloud Firestore stores data in real time.
 
 ---
 
 ## Table of Contents
 
-* [Project Description](#project-description)
 * [Features](#features)
 * [Technology Stack](#technology-stack)
 * [Core Modules](#core-modules)
-* [User Roles](#user-roles)
-* [Firebase Services Used](#firebase-services-used)
+* [User Roles and Access](#user-roles-and-access)
 * [Firestore Collections](#firestore-collections)
+* [Getting Started](#getting-started)
 * [Build APK](#build-apk)
 * [Screenshots](#screenshots)
+* [Live Demo](#live-demo)
 * [Future Improvements](#future-improvements)
-
----
-
-## Project Description
-
-Maa Printing Factory Management is a private factory management system built to simplify and digitize factory-related accounting tasks. Instead of maintaining manual records, the system allows authorized users to manage important factory data such as customer dues, party payments, daily production, and stock records.
-
-The app is designed for internal use by the factory owner, admin, or editor. Public signup is not available. User access is controlled through Firebase Authentication and Firestore-based role verification.
+* [Developer Notes](#developer-notes)
 
 ---
 
 ## Features
 
-* Secure login using Firebase Authentication
-* Role-based access control
-* Admin, editor, and owner access support
-* Real-time dashboard using Cloud Firestore
-* Total due calculation for Danar Parties
-* Total receivable calculation from customers
-* Customer account management
-* Danar Party account management
-* Daily production record management
-* Stock record management
+**Accounts and operations**
+* Danar Party account management, with transaction history and deletion
+* Customer account management, with transaction history and deletion
+* Daily production records
+* Powder stock management with faster entry
+* Ready goods inventory with a history screen, reset and faster entry
+* Real-time dashboard with total payable to parties and total receivable from customers
+
+**Security and access**
+* Firebase email/password login with email verification
+* Role-based access control (owner, admin, editor)
+* Request Access screen for new staff, with owners and admins notified of pending requests
+* Admin panel to view users and their roles
+* Public signup is disabled
+
+**Communication**
+* Built-in staff chat with chat list, chat rooms, unread badges and role badges
+* In-app notifications page
+
+**User experience**
+* Bangla and English language support, switchable from settings
+* Light and dark mode
+* Redesigned UI with shared theme and reusable widgets
+* Responsive layout: width cap on large screens, text scale clamping and adaptive grids for phones, tablets and web
+* Per-product colors across the stock and ready goods screens
+* Settings sheet for language and theme
 * Firebase initialization error handling
-* Logout system
-* Factory logo-based login interface
-* Android APK build support for testing and showcase
+* Logo-based login screen with native splash
 
 ---
 
 ## Technology Stack
 
-* Flutter
-* Dart
-* Firebase Core
-* Firebase Authentication
-* Cloud Firestore
-* Firebase Dynamic Links
-* Flutter Native Splash
-* Flutter Dotenv
+* Flutter and Dart (SDK ^3.8.0)
+* Firebase Core, Firebase Authentication and Cloud Firestore
+* Riverpod (`flutter_riverpod`) for state management
+* `flutter_localizations` and `intl` for Bangla/English
+* `shared_preferences` for saving language and theme
+* Flutter Native Splash and Flutter Launcher Icons
 * Material UI
 
 ---
 
 ## Core Modules
 
-### Authentication Module
+### Authentication
+Email/password login through Firebase Authentication. After login, the app checks the user's email verification and their role in the Firestore `users` collection. Users without an approved role are denied access. New staff can submit an access request from the Request Access screen.
 
-The app uses Firebase Authentication for secure email and password login. After successful authentication, the system checks the user's role from the Firestore `users` collection.
-
-Only users with approved roles can access the dashboard.
-
-Allowed roles:
-
-```text
-admin
-editor
-owner
-```
-
-If a user does not have a valid role, the app signs them out and shows an access denied message.
-
----
-
-### Dashboard Module
-
-The dashboard provides a quick overview of the factory’s current financial status.
-
-It shows:
-
-* Total due to Danar Parties
-* Total receivable from customers
-* Navigation buttons for all main accounting modules
-
-The dashboard data updates in real time using Firestore streams.
-
----
+### Dashboard
+Shows total due to Danar Parties and total receivable from customers, updated live from Firestore. It also has navigation to every module, chat, notifications and settings.
 
 ### Danar Party Hishab
-
-This module is used to manage Danar Party account records. It helps track total bills, paid amounts, and remaining due amounts for party accounts.
-
----
+Manage party accounts, record bills and payments, view transaction history, and delete transactions.
 
 ### Customer Hishab
+Manage customer accounts, record bills and payments, view transaction history, and delete transactions.
 
-This module is used to manage customer account records. It helps track customer bills, payments, and receivable amounts.
+### Daily Production
+Record and review daily production entries.
+
+### Stock (Powder) Hishab
+Track powder stock with quick entry and daily stock records.
+
+### Ready Goods
+Track finished-goods inventory per product, with color-coded products, a history screen and a reset option.
+
+### Chat
+Staff-only messaging with a room list, per-room conversations, unread counts and role badges.
+
+### Notifications
+In-app notifications for access requests and other events, targeted by role.
+
+### Admin Panel
+Lists all users and their assigned roles.
 
 ---
 
-### Daily Production Hishab
+## User Roles and Access
 
-This module is used to record and manage daily production information of the factory.
+| Role   | Access                                        |
+| ------ | --------------------------------------------- |
+| owner  | Full access to the factory management system  |
+| admin  | Administrative access                         |
+| editor | Data entry and management access              |
 
----
-
-### Stock Hishab
-
-This module is used to manage stock-related records and inventory information.
-
----
-
-## User Roles
-
-The app supports role-based access control.
-
-| Role   | Access                                       |
-| ------ | -------------------------------------------- |
-| owner  | Full access to the factory management system |
-| admin  | Administrative access                        |
-| editor | Data entry and management access             |
-
-User roles are stored in Cloud Firestore inside the `users` collection.
-
-Example user document:
+Roles are stored in the `users` collection:
 
 ```json
 {
+  "email": "user@example.com",
   "role": "admin"
 }
 ```
-
----
-
-## Firebase Services Used
-
-### Firebase Authentication
-
-Used for secure email/password login.
-
-### Cloud Firestore
-
-Used for storing and retrieving factory data in real time.
-
-### Firebase Core
-
-Used to initialize Firebase in the Flutter application.
-
-### Firebase Dynamic Links
-
-Currently included in the project dependencies. This package is discontinued, so it can be removed if the app does not use dynamic link features.
 
 ---
 
 ## Firestore Collections
 
-Based on the current project structure, the app uses these Firestore collections:
-
 ```text
 users
-partyAccounts
-customerAccounts
+accessRequests
+notifications
+partyAccounts        (with transactions)
+customerAccounts     (with transactions)
+production_entries
+stock / current_stock / daily_stock_records
+readyGoods           (with history)
+chats                (with messages)
 ```
 
-Possible module-based collections:
-
-```text
-stock records
-daily production records
-```
-
-The exact collection names may depend on the implementation inside each module file.
+Exact structure may vary by module.
 
 ---
 
+## Getting Started
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/Rakibul-rahi/maa_printing.git
+   cd maa_printing
+   ```
+2. Install dependencies
+   ```bash
+   flutter pub get
+   ```
+3. Add your Firebase configuration (`google-services.json` and `firebase_options.dart`). These files are git-ignored.
+4. Run the app
+   ```bash
+   flutter run
+   ```
+
+---
+
+## Build APK
+
+```bash
+flutter build apk --release
+```
+
+The APK is created at `build/app/outputs/flutter-apk/app-release.apk`.
+
+Notes:
+* Android `minSdk` is 23 (required by Firebase Auth) and NDK is `27.0.12077973`.
+* If your Pub cache is on a different drive than the project, `kotlin.incremental=false` in `android/gradle.properties` avoids Kotlin cache path errors.
+
+---
 
 ## Screenshots
 
-Add screenshots of the application here.
-
-```text
-assets/screenshots/login.png
-assets/screenshots/dashboard.png
-assets/screenshots/stock.png
-assets/screenshots/customer.png
-```
-
-Example:
-
 ```markdown
-![Login Screen](assets/screenshots/login.png)
+![Login](assets/screenshots/login.png)
 ![Dashboard](assets/screenshots/dashboard.png)
+![Stock](assets/screenshots/stock.png)
+![Chat](assets/screenshots/chat.png)
 ```
 
 ---
 
-## Current Status
+## Live Demo
 
-The project currently supports:
+**Live Project:** https://appetize.io/app/b_qfqxsp6q2p2zzeomu2w5tmsnoi
 
-* Firebase initialization
-* Secure login
-* Role-based dashboard access
-* Real-time dashboard summary
-* Factory accounting module navigation
-* APK build for Android testing
-
----
-## ✔️ Live Project 
-
-
-
-**Live Project Link:** https://appetize.io/app/b_qfqxsp6q2p2zzeomu2w5tmsnoi
-
-**APK Link:** Not added yet
+**APK:**  [Download app-release.apk](https://drive.google.com/file/d/1AEbS-ROdaNqcmPsXkqRh7539ohBIuIrX/view?usp=sharing)
 
 ---
 
 ## Future Improvements
 
-* Add notification system for due reminders and stock alerts
-* Add password visibility toggle in login screen
-* Add better loading states during login
-* Add user management panel for owner/admin
-* Add PDF report generation
-* Add monthly production report
-* Add search and filter options in account modules
-* Add backup/export option for accounting data
-* Improve responsive UI for web and tablet screens
-* Remove Firebase Dynamic Links if unused
+* PDF and monthly production reports
+* Search and filter in account modules
+* Backup/export of accounting data
+* User management (create, edit and remove roles) in the admin panel
+* Push notifications for dues and stock alerts
+* Remove the discontinued Firebase Dynamic Links package if unused
 
 ---
 
 ## Developer Notes
 
-Public signup is disabled. All users should be created and managed by the administrator through Firebase Authentication and Firestore user role documents.
-
-To give a user access, create the user in Firebase Authentication and add a matching document in Firestore:
-
-```text
-users/{uid}
-```
-
-Example:
-
-```json
-{
-  "role": "admin"
-}
-```
-
-Valid roles are:
-
-```text
-admin
-editor
-owner
-```
+Public signup is disabled. To give a user access, either approve their access request, or create the user in Firebase Authentication and add a matching document at `users/{uid}` with a valid role (`owner`, `admin` or `editor`).
 
 ---
 
