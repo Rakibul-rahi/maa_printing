@@ -24,9 +24,13 @@ final currentAppUserProvider = StreamProvider<AppUser?>((ref) {
 });
 
 /// Every owner / admin / editor, used to start conversations.
-final staffProvider = StreamProvider<List<AppUser>>(
-  (ref) => ref.watch(chatRepositoryProvider).watchStaff(),
-);
+final staffProvider = StreamProvider<List<AppUser>>((ref) {
+  // Rebuild on login/logout so a stale permission-denied from a previous
+  // (or signed-out) session is never reused.
+  final uid = ref.watch(authStateProvider).valueOrNull?.uid;
+  if (uid == null) return Stream.value(const <AppUser>[]);
+  return ref.watch(chatRepositoryProvider).watchStaff();
+});
 
 /// Conversations the current user belongs to, newest first.
 final myChatsProvider = StreamProvider<List<ChatRoom>>((ref) {
